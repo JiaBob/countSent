@@ -3,7 +3,7 @@
 """
 Module implementing HelloWindow.
 """
-import sys, re, os, chardet, csv
+import sys, re, os, chardet
 from PyQt5.QtCore import pyqtSlot
 from PyQt5.QtCore import *
 from PyQt5.QtWidgets import QDialog, QApplication, QFileDialog,QMessageBox
@@ -22,40 +22,9 @@ class HelloWindow(QDialog, Ui_Dialog):
     num=0
     sum=0
     phsum=0
-    settle_exist_flag=0
+    settle_exist_flag=1
     settle_click_flag=0
     total_flag=0
-    thread_flag=0
-    dict={}
-    
-    def closeEvent(self, event):
-        if not self.settle_exist_flag:
-            return
-        reply = QMessageBox.question(self, 'Message', 'Do you want to store them?',QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
-        if reply==QMessageBox.Yes:
-            name = QFileDialog.getSaveFileName(self,  'Save a file', 'C:\\Users\\hp\\Desktop', 'CSV(*.csv)')[0]
-            with open(name,"w",newline="") as datacsv:
-                writer = csv.writer(datacsv,dialect = ("excel"))
-                writer.writerow(["","File Name","Sentence","Phrase"])
-                dict=self.dict
-                for dir in dict:
-                    print(dir)
-                    writer.writerow([dir])
-                    total_s=0
-                    total_p=0
-                    for file in dict[dir]:
-                        print(file)
-                        if file=="Total":
-                            total_s=dict[dir][file][0]
-                            total_p=dict[dir][file][1]
-                        else:
-                            writer.writerow(["",file,dict[dir][file][0],dict[dir][file][1]])
-                    writer.writerow(["Total","", total_s, total_p])
-                    print(dict)
-
-
-
-
     def __init__(self, parent=None):
         """
         Constructor
@@ -73,9 +42,6 @@ class HelloWindow(QDialog, Ui_Dialog):
         self.textEdit.setText(directoryUri)
     @pyqtSlot()
     def on_settlebtn_clicked(self):
-        if self.thread_flag:
-            QMessageBox.information(self,"Hold",  self.tr("Wait!"))
-            return
         self.settle_click_flag=0
         self.sum=0
         self.phsum=0
@@ -86,18 +52,15 @@ class HelloWindow(QDialog, Ui_Dialog):
         
     @pyqtSlot()
     def on_probtn_clicked(self):
-        self.dict[self.directory]={}
-        if self.thread_flag:
-            QMessageBox.information(self,"Hold",  self.tr("Wait!"))
-            return
         if self.directory:
-            if not self.settle_exist_flag:
+                
+            if self.settle_exist_flag:
                 self.settlebtn = QtWidgets.QPushButton()
                 self.settlebtn.setObjectName("settlebtn")
                 self.verticalLayout.addWidget(self.settlebtn)
                 self.settlebtn.setText("Settle")
                 self.settlebtn.clicked.connect(self.on_settlebtn_clicked)
-                self.settle_exist_flag=1
+                self.settle_exist_flag=0
                 
             if not self.total_flag:
                 self.total_flag=1
@@ -139,32 +102,19 @@ class HelloWindow(QDialog, Ui_Dialog):
             self.thread=Thread(self.directory)
             self.thread.signal.connect(self.showresult)
             self.thread.start()
-            self.thread_flag=1
         else:
             QMessageBox.information(self,"Information",  self.tr("Please select a directory first!"))  
 
     def showresult(self, subsum, phrase, file, amount):
-        if file=="xxx":
-            self.label.setText('amount: '+amount)
-        else:
-            self.dict[self.directory][file]=[subsum, phrase]
-            self.sum+=subsum
-            self.total_s+=subsum
-            self.phsum+=phrase
-            self.total_ph+=phrase
-            self.textBrowser.append(file)
-            self.textBrowser_2.append(str(subsum))
-            self.textBrowser_3.append(str(phrase))
-            self.label.setText('Part'+str(self.num)+':  '+str(self.sum)+' sentences   '+str(self.phsum//2)+' phrases   '+amount)
-            self.label_total.setText("<html><body><p><span style='color:red'>Total:   "+str(self.total_s)+" sentences   "+str(self.total_ph//2)+" phrases   </span></p></body></html>")
-            am=re.split('/', amount)
-            if am[0]==am[1]:
-                self.thread_flag=0
-                QMessageBox.information(self,"Information",  self.tr("Tasks finished!"))
-                self.dict[self.directory]["Total"]=[self.total_s, self.total_ph]
-
-                
-                
+        self.sum+=subsum
+        self.total_s+=subsum
+        self.phsum+=phrase
+        self.total_ph+=phrase
+        self.textBrowser.append(file)
+        self.textBrowser_2.append(str(subsum))
+        self.textBrowser_3.append(str(phrase))
+        self.label.setText('Part'+str(self.num)+':  '+str(self.sum)+' sentences   '+str(self.phsum//2)+' phrases   '+amount)
+        self.label_total.setText("<html><body><p><span style='color:red'>Total:   "+str(self.total_s)+" sentences   "+str(self.total_ph//2)+" phrases   </span></p></body></html>")
 
 class Thread(QThread):
     
@@ -173,43 +123,46 @@ class Thread(QThread):
     def __init__(self, directory):
         self.directory=directory
         super(Thread, self).__init__()
+        print(self.directory)
     def run(self):
-        file_array=[]
-        amount=0
+        sum=phsum=0
         for root, dirs, files in os.walk(self.directory):
+            amount=0
+            current_amount=0
+            file_array=[]
             for file in files:
-                    if re.search('.txt$', file):
-                        amount+=1
-                        file_array.append(os.path.join(root, file))
-                        self.signal.emit(0, 0, 'xxx', str(amount))
-        current_amount=0
-        for file in file_array:
-            file_name=re.sub(self.directory, '', file)
-            #path=os.path.join(root, file)
-            #print(path)
-            file=open(file, 'rb+')
-            string=file.read()
-            coding=chardet.detect(string)['encoding']
-            if coding:
-                string=string.decode(coding)
-            else:
-                string=''
-            subsum=0
-            phrase=0
-            token=0
-            for word in string:
-                if re.match(r'[\u3002\uff01\uff1f\uff1b]', word):
-                    subsum+=1
-                    token=1
-                elif re.match(r'\n', word):
-                    phrase+=1
-                    if token==1:
-                        phrase-=1
-                        token=0
-                        
-            current_amount+=1
-            result_amount=str(current_amount)+'/'+str(amount)
-            self.signal.emit(subsum, phrase, file_name, result_amount)
+                if re.search('.txt$', file):
+                    amount+=1
+                    file_array.append(file)
+            for file in file_array:
+                file_name=file
+                path=os.path.join(root, file)
+                file=open(path, 'rb+')
+                string=file.read()
+                coding=chardet.detect(string)['encoding']
+                if coding:
+                    string=string.decode(coding)
+                else:
+                    string=''
+                subsum=0
+                phrase=0
+                token=0
+                for word in string:
+                    if re.match(r'[\u3002\uff01\uff1f]', word):
+                        subsum+=1
+                        token=1
+                    elif re.match(r'\n', word):
+                        phrase+=1
+                        if token==1:
+                            phrase-=1
+                            token=0
+                            
+                current_amount+=1
+                phsum+=phrase
+                sum+=subsum
+                result_amount=str(current_amount)+'/'+str(amount)
+                self.signal.emit(subsum, phrase, file_name, result_amount)
+                print(subsum)
 
 
 
