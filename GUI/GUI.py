@@ -106,12 +106,13 @@ class HelloWindow(QDialog, Ui_Dialog):
     @pyqtSlot()
     def on_probtn_clicked(self):
         if not self.expression:
-            if self.lineEdit and not self.lineEdit.text():
-                QMessageBox.warning(self,"Warning!",  self.tr("Please input a pattern"))
-                return
-            else:
-                self.expression=self.lineEdit.text()
-                return
+            if not self.pushButton:
+                if not self.lineEdit.text():
+                    QMessageBox.warning(self,"Warning!",  self.tr("Please input a pattern"))
+                    return
+                else:
+                    self.expression=self.lineEdit.text()
+                    return
             QMessageBox.warning(self,"Warning!",  self.tr("Please select a pattern"))
             return
         self.dict[self.directory]={}
@@ -181,7 +182,7 @@ class HelloWindow(QDialog, Ui_Dialog):
                 sizePolicy.setVerticalStretch(2)
                 sizePolicy.setHeightForWidth(self.textBrowser.sizePolicy().hasHeightForWidth())
                 self.textBrowser_4.setSizePolicy(sizePolicy)
-                self.textBrowser_4.setMinimumSize(QtCore.QSize(0, 130))
+                self.textBrowser_4.setMinimumSize(QtCore.QSize(0, 80))
                 self.textBrowser_4.setMaximumSize(QtCore.QSize(1000, 1000))
                 self.textBrowser_4.setObjectName("textBrowser")
                 self.verticalLayout.addWidget(self.textBrowser_4)
@@ -226,28 +227,30 @@ class Thread(QThread):
                         file_array.append(os.path.join(root, file))
                         self.signal.emit(0, 'xxx', str(amount), failure)
         current_amount=0
-        for file in file_array:
-            file_name=re.sub(self.directory, '', file)
-            #path=os.path.join(root, file)
-            #print(path)
-            try:
-                file=codecs.open(file, 'r', 'utf-8')
-            except:
-                failure="failure occurs on: "+file_name
-            try:
-                string=file.read()
-                file.close()
-            except:
-                failure="codec error on: "+file_name
-            pattern=re.compile(self.expression)
-            sentences=re.split(pattern, string)
-            count=len(sentences)-1
-            
-            current_amount+=1
-            result_amount=str(current_amount)+'/'+str(amount)
-            
-            self.signal.emit(count, file_name, result_amount, failure)
-            
+        if file_array:
+            for file in file_array:
+                file_name=re.sub(self.directory, '', file)
+                #path=os.path.join(root, file)
+                #print(path)
+                try:
+                    file=codecs.open(file, 'r', 'utf-8')
+                except:
+                    failure="failure occurs on: "+file_name
+                try:
+                    string=file.read()
+                    file.close()
+                except:
+                    failure="codec error on: "+file_name
+                pattern=re.compile(self.expression)
+                sentences=re.split(pattern, string)
+                count=len(sentences)-1
+                
+                current_amount+=1
+                result_amount=str(current_amount)+'/'+str(amount)
+                
+                self.signal.emit(count, file_name, result_amount, failure)
+        else:
+             self.signal.emit(0, "no txt file", "0/0", "no txt file")
 #            subsum, phrase, token, line=0, 0, 0, 0
 #            for word in string:
 #                if re.match(r'[\u3002\uff01\uff1f\uff1b]', word):
